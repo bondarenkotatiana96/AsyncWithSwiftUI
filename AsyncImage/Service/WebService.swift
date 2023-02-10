@@ -1,0 +1,60 @@
+//
+//  WebService.swift
+//  AsyncImage
+//
+//  Created by Tatiana Bondarenko on 2/9/23.
+//
+
+import Foundation
+
+class WebService {
+
+//    func downloadCurrenciesAsync(url: URL) async throws -> [CryptoCurrency] {
+//        // instead of throws we need to do do try catch
+//        let (data, _) = try await URLSession.shared.data(from: url)
+//
+//        let currencies = try? JSONDecoder().decode([CryptoCurrency].self, from: data)
+//
+//        return currencies ?? []
+//    }
+
+    func downloadCurrenciesContinuation(url: URL) async throws -> [CryptoCurrency] {
+        try await withCheckedThrowingContinuation({ continuation in
+            downloadCurrencies(url: url) { result in
+                switch result {
+                case .success(let cryptos):
+                    continuation.resume(returning: cryptos ?? [])
+                case .failure(let error):
+                    continuation.resume(throwing: error)
+                }
+            }
+
+        })
+    }
+
+    func downloadCurrencies(url: URL, completion: @escaping (Result<[CryptoCurrency]?, DownloadError>) -> Void) {
+
+        URLSession.shared.dataTask(with: url) { data, response, error in
+            if let error = error {
+                print(error.localizedDescription)
+                completion(.failure(.badURL))
+            }
+
+            guard let data = data, error == nil else {
+                return completion(.failure(.noData))
+            }
+
+            guard let currencies = try? JSONDecoder().decode([CryptoCurrency].self, from: data) else {
+                return completion(.failure(.dataParseError))
+            }
+
+            completion(.success(currencies))
+        }.resume()
+    }
+}
+
+enum DownloadError: Error {
+    case badURL
+    case noData
+    case dataParseError
+}
